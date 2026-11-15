@@ -2,6 +2,13 @@ name: Build private Telegram APK
 
 on:
   workflow_dispatch:
+    inputs:
+      api_id:
+        description: "Telegram api_id (number)"
+        required: true
+      api_hash:
+        description: "Telegram api_hash"
+        required: true
 
 jobs:
   build:
@@ -23,13 +30,13 @@ jobs:
 
       - name: Insert own api_id and api_hash
         env:
-          TG_API_ID: ${{ secrets.TG_API_ID }}
-          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_API_ID: ${{ inputs.api_id }}
+          TG_API_HASH: ${{ inputs.api_hash }}
         run: |
+          echo "::add-mask::${TG_API_HASH}"
           F=TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java
           sed -i "s/public static int APP_ID = .*;/public static int APP_ID = ${TG_API_ID};/" "$F"
           sed -i "s/public static String APP_HASH = \".*\";/public static String APP_HASH = \"${TG_API_HASH}\";/" "$F"
-          grep -n "APP_ID =\|APP_HASH =" "$F" | sed 's/"[0-9a-f]\{32\}"/"***"/'
 
       - name: Build APK
         run: ./gradlew :TMessagesProj_App:assembleAfatRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx6g"
