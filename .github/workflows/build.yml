@@ -1,0 +1,40 @@
+name: Build private Telegram APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Android NDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+
+      - name: Insert own api_id and api_hash
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+        run: |
+          F=TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java
+          sed -i "s/public static int APP_ID = .*;/public static int APP_ID = ${TG_API_ID};/" "$F"
+          sed -i "s/public static String APP_HASH = \".*\";/public static String APP_HASH = \"${TG_API_HASH}\";/" "$F"
+          grep -n "APP_ID =\|APP_HASH =" "$F" | sed 's/"[0-9a-f]\{32\}"/"***"/'
+
+      - name: Build APK
+        run: ./gradlew :TMessagesProj_App:assembleAfatRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx6g"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: telegram-apk
+          path: TMessagesProj_App/build/outputs/apk/**/*.apk
